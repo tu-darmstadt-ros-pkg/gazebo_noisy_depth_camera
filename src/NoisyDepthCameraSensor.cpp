@@ -176,8 +176,7 @@ bool NoisyDepthCameraSensor::depthCameraSensorInit()
 
 NoisyDepthCameraSensor::~NoisyDepthCameraSensor() // NOLINT(hicpp-use-equals-default,modernize-use-equals-default)
 {
-  if (this->dataPtr->depthBuffer)
-    delete [] this->dataPtr->depthBuffer;
+  delete [] this->dataPtr->depthBuffer;
 }
 
 void NoisyDepthCameraSensor::Reset()
@@ -200,8 +199,6 @@ NoisePtr NoisyDepthCameraSensor::CreateNoiseModel(sdf::ElementPtr _sdf,
               "Noise type should be 'gaussian'");
 
     noise->Load(_sdf);
-    auto gaussian_noise_ptr = std::dynamic_pointer_cast<GaussianNoiseModel>(noise);
-    gzmsg << "Created depth camera " << this->Name() << " with Gaussian noise (mean = " << gaussian_noise_ptr->GetMean() << ", stddev = " << gaussian_noise_ptr->GetStdDev() << ")" << std::endl;
     return noise;
   }
   else if (typeString == "gaussian_multiplicative" && _sensorType == "depth")
