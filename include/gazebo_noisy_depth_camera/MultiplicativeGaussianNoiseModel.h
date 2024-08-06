@@ -14,6 +14,9 @@ class MultiplicativeGaussianNoiseModel : public ImageGaussianNoiseModel, public 
 {
   public: void SetCamera(rendering::CameraPtr _camera) override;
   public: void ApplyFloat(float* _buffer, size_t _width, size_t _height, size_t _depth, const std::string& _pixelFormat) override;
+
+  private: rendering::CameraPtr camera_;
+
 };
 
 }

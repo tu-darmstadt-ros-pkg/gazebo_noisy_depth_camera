@@ -9,7 +9,7 @@ namespace sensors
 
 void DepthImageGaussianNoiseModel::SetCamera(rendering::CameraPtr _camera)
 {
-  // TODO empty until we find a way to utilize OpenGL for this
+  camera_ = _camera;
 }
 
 void DepthImageGaussianNoiseModel::ApplyFloat(float* _buffer, size_t _width, size_t _height, size_t _depth, const std::string& _pixelFormat)
@@ -18,6 +18,9 @@ void DepthImageGaussianNoiseModel::ApplyFloat(float* _buffer, size_t _width, siz
   {
     for (size_t i = 0; i < _width * _height; ++i)
     {
+      if (_buffer[i] == camera_->NearClip() || _buffer[i] == camera_->FarClip())
+        continue;
+
       _buffer[i] += static_cast<float>(
           ignition::math::Rand::DblNormal(this->mean, this->stdDev) + this->bias);
     }
