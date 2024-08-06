@@ -27,6 +27,9 @@ class GZ_SENSORS_VISIBLE NoisyDepthCameraSensor : public DepthCameraSensor
       const std::string &_sensorType);
   protected: bool UpdateImpl( bool _force ) override;
 
+  private: bool depthCameraSensorInit();
+  private: bool registerNoiseCallback(const sdf::ElementPtr& _sdf);
+
   private: std::unique_ptr<NoisyDepthCameraSensorPrivate> dataPtr;
 
   private: friend struct NoisyDepthCameraSensorPrivate;

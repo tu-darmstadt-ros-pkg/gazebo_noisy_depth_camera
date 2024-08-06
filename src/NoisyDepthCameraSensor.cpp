@@ -55,104 +55,12 @@ void NoisyDepthCameraSensor::Load(const std::string &_worldName)
 
 void NoisyDepthCameraSensor::Init()
 {
-  if (rendering::RenderEngine::Instance()->GetRenderPathType() ==
-       rendering::RenderEngine::NONE)
-  {
-    gzerr << "Unable to create DepthCameraSensor. Rendering is disabled."
-          << std::endl;
-    return;
-  }
-
-  std::string worldName = this->world->Name();
-
-  if (!worldName.empty())
-  {
-    this->scene = rendering::get_scene(worldName);
-
-    if (!this->scene)
-      this->scene = rendering::create_scene(worldName, false, true);
-
-    this->dataPtr->depthCamera = this->scene->CreateDepthCamera(
-        this->sdf->Get<std::string>("name"), false);
-    if (!this->dataPtr->depthCamera)
-    {
-      gzerr << "Unable to create depth camera sensor" << std::endl;
-      return;
-    }
-    this->dataPtr->depthCamera->SetCaptureData(true);
-    sdf::ElementPtr cameraSdf = this->sdf->GetElement("camera");
-    this->dataPtr->depthCamera->Load(cameraSdf);
-    // Do some sanity checks
-    if (this->dataPtr->depthCamera->ImageWidth() == 0u ||
-         this->dataPtr->depthCamera->ImageHeight() == 0u)
-    {
-      gzerr << "image has zero size" << std::endl;
-    }
-
-    this->dataPtr->depthCamera->Init();
-    this->dataPtr->depthCamera->CreateRenderTexture(
-        this->Name() + "_RttTex_Image");
-    this->dataPtr->depthCamera->CreateDepthTexture(
-        this->Name() + "_RttTex_Depth");
-    this->dataPtr->depthCamera->CreateReflectanceTexture(
-        this->Name() + "_RttTex_Reflectance");
-    this->dataPtr->depthCamera->CreateNormalsTexture(
-        this->Name() + "_RttTex_Normals");
-    ignition::math::Pose3d cameraPose = this->pose;
-    if (cameraSdf->HasElement("pose"))
-      cameraPose = cameraSdf->Get<ignition::math::Pose3d>("pose") + cameraPose;
-
-    this->dataPtr->depthCamera->SetWorldPose(cameraPose);
-    this->dataPtr->depthCamera->AttachToVisual(this->parentId, true, 0, 0);
-    this->camera = boost::dynamic_pointer_cast<rendering::Camera>(
-        this->dataPtr->depthCamera);
-
-    GZ_ASSERT(this->camera, "Unable to cast depth camera to camera");
-  }
-  else
-  {
-    gzerr << "No world name" << std::endl;
-  }
-  // Disable clouds and moon on server side until fixed and also to improve
-  // performance
-  this->scene->SetSkyXMode(rendering::Scene::GZ_SKYX_ALL &
-                            ~rendering::Scene::GZ_SKYX_CLOUDS &
-                            ~rendering::Scene::GZ_SKYX_MOON);
+  if (!depthCameraSensorInit()) return;
 
   sdf::ElementPtr cameraSdf = this->sdf->GetElement("camera");
   if (cameraSdf->HasElement("noise"))
   {
-    this->noises[CAMERA_NOISE] =
-        this->CreateNoiseModel(cameraSdf->GetElement("noise"), this->Type());
-
-    this->noises[CAMERA_NOISE]->SetCamera(this->camera);
-
-    auto postRenderImageNoise = std::dynamic_pointer_cast<PostRenderImageNoise>(
-        this->noises[CAMERA_NOISE]);
-    if (postRenderImageNoise != nullptr)
-    {
-      const auto nearClip = this->dataPtr->depthCamera->NearClip();
-      const auto farClip = this->dataPtr->depthCamera->FarClip();
-      this->dataPtr->depthFrameConnection = this->DepthCamera()->ConnectNewDepthFrame(
-          [postRenderImageNoise,nearClip,farClip](const float* _buffer, size_t _width, size_t _height, size_t _depth, const std::string& _pixelFormat)
-          {
-            // HACK: there's no better way to alter the generated depth image than hooking the
-            // newDepthFrame callback which is passing a const pointer to the data.
-            // But we know (by construction of this sensor) that we'll be the first hook
-            // that gets called, and we also know that we can const_cast the passed data
-            // (because the underlying data structure is on the heap, which is always modifiable).
-            auto writableBuffer = const_cast<float*>(_buffer);
-            postRenderImageNoise->ApplyFloat(writableBuffer, _width, _height, _depth, _pixelFormat);
-            for (size_t i = 0; i < _width * _height * _depth; ++i)
-            {
-              if (writableBuffer[i] < nearClip)
-                writableBuffer[i] = -ignition::math::INF_F;
-              else if (writableBuffer[i] > farClip)
-                writableBuffer[i] = ignition::math::INF_F;
-            }
-          }
-      );
-    }
+    registerNoiseCallback(cameraSdf->GetElement("noise"));
   }
 
   // Load other plugins
@@ -163,6 +71,109 @@ void NoisyDepthCameraSensor::Init()
   this->dataPtr->timeResetConnection = event::Events::ConnectTimeReset(
       std::bind(&NoisyDepthCameraSensor::Reset, this));
 }
+
+bool NoisyDepthCameraSensor::registerNoiseCallback(const sdf::ElementPtr& _sdf)
+{
+  this->noises[CAMERA_NOISE] =
+      this->CreateNoiseModel(_sdf, this->Type());
+
+  this->noises[CAMERA_NOISE]->SetCamera(this->camera);
+
+  auto postRenderImageNoise = std::dynamic_pointer_cast<PostRenderImageNoise>(
+      this->noises[CAMERA_NOISE]);
+  if (postRenderImageNoise != nullptr)
+  {
+    const auto nearClip = this->dataPtr->depthCamera->NearClip();
+    const auto farClip = this->dataPtr->depthCamera->FarClip();
+    this->dataPtr->depthFrameConnection = this->DepthCamera()->ConnectNewDepthFrame(
+        [postRenderImageNoise,nearClip,farClip](const float* _buffer, size_t _width, size_t _height, size_t _depth, const std::string& _pixelFormat)
+        {
+          // HACK: there's no better way to alter the generated depth image than hooking the
+          // newDepthFrame callback which is passing a const pointer to the data.
+          // But we know (by calling this before Sensor::Init()) that we'll be the first hook
+          // that gets called, and we also know that we can const_cast the passed data
+          // (because the underlying data structure is on the heap, which is always modifiable).
+          auto writableBuffer = const_cast<float*>(_buffer);
+          postRenderImageNoise->ApplyFloat(writableBuffer, _width, _height, _depth, _pixelFormat);
+          for (size_t i = 0; i < _width * _height * _depth; ++i)
+          {
+            if (writableBuffer[i] < nearClip)
+              writableBuffer[i] = -ignition::math::INF_F;
+            else if (writableBuffer[i] > farClip)
+              writableBuffer[i] = ignition::math::INF_F;
+          }
+        }
+    );
+  }
+  return false;
+}
+
+
+bool NoisyDepthCameraSensor::depthCameraSensorInit()
+{
+  if (rendering::RenderEngine::Instance()->GetRenderPathType() ==
+       rendering::RenderEngine::NONE)
+  {
+    gzerr << "Unable to create DepthCameraSensor. Rendering is disabled."
+          << std::endl;
+    return false;
+  }
+
+  std::string worldName = this->world->Name();
+  if (worldName.empty()) {
+    gzerr << "No world name" << std::endl;
+    return false;
+  }
+
+  this->scene = rendering::get_scene(worldName);
+  if (!this->scene)
+    this->scene = rendering::create_scene(worldName, false, true);
+
+  this->dataPtr->depthCamera = this->scene->CreateDepthCamera(
+      this->sdf->Get<std::string>("name"), false);
+  if (!this->dataPtr->depthCamera)
+  {
+    gzerr << "Unable to create depth camera sensor" << std::endl;
+    return false;
+  }
+  this->dataPtr->depthCamera->SetCaptureData(true);
+  sdf::ElementPtr cameraSdf = this->sdf->GetElement("camera");
+  this->dataPtr->depthCamera->Load(cameraSdf);
+  // Do some sanity checks
+  if (this->dataPtr->depthCamera->ImageWidth() == 0u ||
+       this->dataPtr->depthCamera->ImageHeight() == 0u)
+  {
+    gzerr << "image has zero size" << std::endl;
+  }
+
+  this->dataPtr->depthCamera->Init();
+  this->dataPtr->depthCamera->CreateRenderTexture(
+      this->Name() + "_RttTex_Image");
+  this->dataPtr->depthCamera->CreateDepthTexture(
+      this->Name() + "_RttTex_Depth");
+  this->dataPtr->depthCamera->CreateReflectanceTexture(
+      this->Name() + "_RttTex_Reflectance");
+  this->dataPtr->depthCamera->CreateNormalsTexture(
+      this->Name() + "_RttTex_Normals");
+  ignition::math::Pose3d cameraPose = this->pose;
+  if (cameraSdf->HasElement("pose"))
+    cameraPose = cameraSdf->Get<ignition::math::Pose3d>("pose") + cameraPose;
+
+  this->dataPtr->depthCamera->SetWorldPose(cameraPose);
+  this->dataPtr->depthCamera->AttachToVisual(this->parentId, true, 0, 0);
+  this->camera = boost::dynamic_pointer_cast<rendering::Camera>(
+      this->dataPtr->depthCamera);
+
+  GZ_ASSERT(this->camera, "Unable to cast depth camera to camera");
+
+  // Disable clouds and moon on server side until fixed and also to improve
+  // performance
+  this->scene->SetSkyXMode(rendering::Scene::GZ_SKYX_ALL &
+                            ~rendering::Scene::GZ_SKYX_CLOUDS &
+                            ~rendering::Scene::GZ_SKYX_MOON);
+  return true;
+}
+
 
 NoisyDepthCameraSensor::~NoisyDepthCameraSensor() // NOLINT(hicpp-use-equals-default,modernize-use-equals-default)
 {
