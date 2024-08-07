@@ -24,8 +24,9 @@ link_directories(
 
 add_library(${PROJECT_NAME}
   src/NoisyDepthCameraSensor.cpp
-  src/DepthImageGaussianNoiseModel.cpp
-  src/MultiplicativeGaussianNoiseModel.cpp
+  src/noise_models/DepthImageGaussianNoiseModel.cpp
+  src/noise_models/MultiplicativeGaussianNoiseModel.cpp
+  src/noise_models/PolynomialGaussianNoiseModel.cpp
 )
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})

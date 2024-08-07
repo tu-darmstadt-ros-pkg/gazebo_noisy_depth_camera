@@ -1,4 +1,4 @@
-#include <gazebo_noisy_depth_camera/MultiplicativeGaussianNoiseModel.h>
+#include <gazebo_noisy_depth_camera/noise_models/MultiplicativeGaussianNoiseModel.h>
 #include <gazebo/rendering/Camera.hh>
 #include <ignition/math/Rand.hh>
 

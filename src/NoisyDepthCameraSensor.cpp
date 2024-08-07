@@ -1,6 +1,7 @@
 #include <gazebo_noisy_depth_camera/NoisyDepthCameraSensor.h>
-#include <gazebo_noisy_depth_camera/DepthImageGaussianNoiseModel.h>
-#include <gazebo_noisy_depth_camera/MultiplicativeGaussianNoiseModel.h>
+#include <gazebo_noisy_depth_camera/noise_models/DepthImageGaussianNoiseModel.h>
+#include <gazebo_noisy_depth_camera/noise_models/MultiplicativeGaussianNoiseModel.h>
+#include <gazebo_noisy_depth_camera/noise_models/PolynomialGaussianNoiseModel.h>
 #include <gazebo/transport/transport.hh>
 #include <gazebo/common/Time.hh>
 #include <gazebo/common/Events.hh>
@@ -211,9 +212,16 @@ NoisePtr NoisyDepthCameraSensor::CreateNoiseModel(sdf::ElementPtr _sdf,
     noise->Load(_sdf);
     return noise;
   }
-  // TODO: implement stereo noise model from:
-  // - https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6375037
-  // - https://github.com/HannesKeller/sensor_model
+  else if (typeString == "polynomial_gaussian" && _sensorType == "depth")
+  {
+    NoisePtr noise(new PolynomialGaussianNoiseModel());
+
+    GZ_ASSERT(noise->GetNoiseType() == Noise::CUSTOM,
+               "Noise type should be 'custom'");
+
+    noise->Load(_sdf);
+    return noise;
+  }
   else
   {
     return NoiseFactory::NewNoiseModel(_sdf, _sensorType);

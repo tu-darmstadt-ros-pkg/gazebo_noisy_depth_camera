@@ -1,4 +1,4 @@
-#include <gazebo_noisy_depth_camera/DepthImageGaussianNoiseModel.h>
+#include <gazebo_noisy_depth_camera/noise_models/DepthImageGaussianNoiseModel.h>
 #include <gazebo/rendering/Camera.hh>
 #include <ignition/math/Rand.hh>
 
@@ -21,8 +21,11 @@ void DepthImageGaussianNoiseModel::ApplyFloat(float* _buffer, size_t _width, siz
       if (_buffer[i] == camera_->NearClip() || _buffer[i] == camera_->FarClip())
         continue;
 
+//      double tmp = (_buffer[i] - 0.4);
+//      double stddev = 0.0012 + 0.0019 * tmp * tmp;
+      double stddev = 0.001063 + 0.0007278 * _buffer[i] + 0.003949 * _buffer[i] * _buffer[i];
       _buffer[i] += static_cast<float>(
-          ignition::math::Rand::DblNormal(this->mean, this->stdDev) + this->bias);
+          ignition::math::Rand::DblNormal(0.0, stddev) + this->bias);
     }
   }
   else

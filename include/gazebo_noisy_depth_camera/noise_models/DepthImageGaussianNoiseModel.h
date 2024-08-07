@@ -2,7 +2,7 @@
 #define GAZEBO_NOISY_DEPTH_CAMERA_DEPTHIMAGEGAUSSIANNOISEMODEL_H
 
 #include <gazebo/sensors/GaussianNoiseModel.hh>
-#include <gazebo_noisy_depth_camera/PostRenderImageNoise.h>
+#include <gazebo_noisy_depth_camera/noise_models/PostRenderImageNoise.h>
 #include <gazebo/sensors/Noise.hh>
 
 namespace gazebo
