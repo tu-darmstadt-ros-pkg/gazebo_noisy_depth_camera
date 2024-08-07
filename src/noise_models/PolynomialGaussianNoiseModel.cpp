@@ -41,6 +41,10 @@ void PolynomialGaussianNoiseModel::ApplyFloat(float* _buffer, size_t _width, siz
 void PolynomialGaussianNoiseModel::Load( sdf::ElementPtr _sdf ) {
   Noise::Load( _sdf );
   auto coefficients_str = _sdf->Get<std::string>("coefficients");
+  if (coefficients_str.empty()) {
+    gzerr << "Did not find coefficients parameter of polynomial gaussian noise model." << std::endl;
+    return;
+  }
   std::vector<std::string> coefficients_str_vec;
   boost::split(coefficients_str_vec, coefficients_str, boost::is_any_of(" "), boost::token_compress_on);
   if (coefficients_str_vec.size() != 3) {
@@ -48,7 +52,11 @@ void PolynomialGaussianNoiseModel::Load( sdf::ElementPtr _sdf ) {
     return;
   }
   for (unsigned int i = 0; i < 3; ++i) {
-    coefficients_[i] = std::stod(coefficients_str_vec[i]);
+    try {
+      coefficients_[i] = std::stod(coefficients_str_vec[i]);
+    } catch (const std::exception& e) {
+      gzerr << "Could not convert " << coefficients_str_vec[i] << " to a double: " << e.what() << std::endl;
+    }
   }
 }
 
