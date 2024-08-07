@@ -97,9 +97,9 @@ bool NoisyDepthCameraSensor::registerNoiseCallback(const sdf::ElementPtr& _sdf)
           postRenderImageNoise->ApplyFloat(writableBuffer, _width, _height, _depth, _pixelFormat);
           for (size_t i = 0; i < _width * _height * _depth; ++i)
           {
-            if (writableBuffer[i] < nearClip)
+            if (writableBuffer[i] <= nearClip)
               writableBuffer[i] = -ignition::math::INF_F;
-            else if (writableBuffer[i] > farClip)
+            else if (writableBuffer[i] >= farClip)
               writableBuffer[i] = ignition::math::INF_F;
           }
         }
